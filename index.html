@@ -1,17 +1,28 @@
 <div>Teachable Machine Image Model</div>
-<button type="button" onclick="init()">Start</button>
+<button type="button" onclick="init()">Bắt đầu</button>
 <div id="webcam-container"></div>
 <div id="label-container"></div>
+
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
-<script type="text/javascript">
-    // More API functions here:
-    // https://github.com/googlecreativelab/teachablemachine-community/tree/master/libraries/image
 
-    // the link to your model provided by Teachable Machine export panel
-    const URL = "https://teachablemachine.withgoogle.com/models/886agW9F2/";
+<script type="text/javascript">
+    // Link URL đến mô hình AI của bạn (thay link của tôi bằng link CỦA BẠN)
+    const URL = "https://teachablemachine.withgoogle.com/models/886aqW9F2/";
 
     let model, webcam, labelContainer, maxPredictions;
+
+    // --- PHẦN TÍCH HỢP ÂM THANH ---
+    // 1. Khai báo các file âm thanh (tên file phải khớp với file bạn tải lên GitHub)
+    const soundrac_vo_co = new Audio('rac_vo_co.mp3');
+    const soundrac_huu_co = new Audio('rac_huu_co.mp3');
+    const soundrac_vo_co_khong_tai_che = new Audio('rac_vo_co_khong_tai_che.mp3');
+    const soundhay_cho_rac = new Audio('hay_cho_rac.mp3');
+
+    // Biến này để đảm bảo âm thanh chỉ phát 1 lần, không bị lặp
+    let lastPlayedLabel = ""; 
+    // --- HẾT PHẦN ÂM THANH ---
+
 
     // Load the image model and setup the webcam
     async function init() {
@@ -19,13 +30,10 @@
         const metadataURL = URL + "metadata.json";
 
         // load the model and metadata
-        // Refer to tmImage.loadFromFiles() in the API to support files from a file picker
-        // or files from your local hard drive
-        // Note: the pose library adds "tmImage" object to your window (window.tmImage)
         model = await tmImage.load(modelURL, metadataURL);
         maxPredictions = model.getTotalClasses();
 
-        // Convenience function to setup a webcam
+        // Setup webcam
         const flip = true; // whether to flip the webcam
         webcam = new tmImage.Webcam(200, 200, flip); // width, height, flip
         await webcam.setup(); // request access to the webcam
@@ -50,11 +58,52 @@
     async function predict() {
         // predict can take in an image, video or canvas html element
         const prediction = await model.predict(webcam.canvas);
+
+        let highestProb = 0;
+        let highestLabel = "";
+
+        // Vòng lặp tìm dự đoán cao nhất
         for (let i = 0; i < maxPredictions; i++) {
             const classPrediction =
                 prediction[i].className + ": " + prediction[i].probability.toFixed(2);
             labelContainer.childNodes[i].innerHTML = classPrediction;
+
+            if (prediction[i].probability > highestProb) {
+                highestProb = prediction[i].probability;
+                highestLabel = prediction[i].className;
+            }
         }
+
+        // --- PHẦN LOGIC PHÁT ÂM THANH ---
+        // 2. Chỉ phát khi AI rất chắc chắn (ví dụ: > 90%)
+        if (highestProb > 0.90) {
+            // Và chỉ phát khi nhãn này khác với nhãn vừa phát
+            if (highestLabel !== lastPlayedLabel) {
+                
+                if (highestLabel === "Rac_vo_co_tai_che") { // Tên lớp phải khớp tên bạn đặt
+                    soundrac_vo_co.play();
+                    lastPlayedLabel = "Rac_vo_co_tai_che"; // Đánh dấu là đã phát
+                } 
+                else if (highestLabel === "Rac_huu_co") {
+                    soundrac_huu_co.play();
+                    lastPlayedLabel = "Rac_huu_co";
+                } 
+                else if (highestLabel === "Rac_vo_co_khong_tai_che") {
+                    soundrac_vo_co_khong_tai_che.play();
+                    lastPlayedLabel = "Rac_vo_co_khong_tai_che";
+                }
+                else if (highestLabel === "Hay_cho_rac") {
+                    soundhay_cho_rac.play();
+                    lastPlayedLabel = "Hay_cho_rac";
+                }
+            }
+        } else {
+            // Nếu AI không chắc chắn (ví dụ: khi chuyển vật), reset lại
+            lastPlayedLabel = "";
+        }
+        // --- HẾT PHẦN LOGIC ÂM THANH ---
     }
 </script>
-									
+<hr>
+<h1>Trạm 2: Hành Trình Của Rác</h1>
+... (v.v...)
