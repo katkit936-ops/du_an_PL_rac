@@ -2,13 +2,14 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Trạm 1: AI Phân Loại Rác</title>
+    <title>Dự Án AI Phân Loại Rác</title>
     <style>
-        /* CSS để giao diện đẹp hơn một chút */
-        body { font-family: Arial, sans-serif; text-align: center; margin-top: 20px; }
-        #webcam-container { margin-top: 10px; border: 2px solid black; display: inline-block; }
-        #label-container { margin-top: 10px; font-size: 1.2em; font-weight: bold; }
-        button { font-size: 1.2em; padding: 10px 20px; cursor: pointer; }
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 20px; background-color: #f4f4f4; }
+        h1 { color: #333; }
+        #webcam-container { margin-top: 10px; border: 3px solid #555; display: inline-block; border-radius: 8px; }
+        #label-container { margin-top: 15px; font-size: 1.3em; font-weight: bold; color: #0056b3; }
+        button { font-size: 1.2em; padding: 12px 25px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 5px; }
+        button:hover { background-color: #0056b3; }
     </style>
 </head>
 <body>
@@ -22,23 +23,31 @@
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 
     <script type="text/javascript">
-        // *** BƯỚC QUAN TRỌNG NHẤT Ở ĐÂY ***
-        // LẤY LINK MỚI TỪ TEACHABLE MACHINE VÀ DÁN VÀO ĐÂY
+        
+        // !!! BƯỚC QUAN TRỌNG NHẤT: THAY LINK CỦA BẠN VÀO ĐÂY !!!
+        // (Lấy link MỚI NHẤT từ Teachable Machine sau khi "Update model")
         const URL = "https://teachablemachine.withgoogle.com/models/886agW9F2/";
 
         let model, webcam, labelContainer, maxPredictions;
 
-        // --- PHẦN ÂM THANH ---
+        // --- Khai báo các file Âm thanh ---
+        // (Đảm bảo 4 file này đã được tải lên GitHub, nằm chung thư mục với index.html)
         const soundrac_vo_co = new Audio('rac_vo_co.mp3');
         const soundrac_huu_co = new Audio('rac_huu_co.mp3');
         const soundrac_vo_co_khong_tai_che = new Audio('rac_vo_co_khong_tai_che.mp3');
         const soundhay_cho_rac = new Audio('hay_cho_rac.mp3');
         let lastPlayedLabel = "";
-        // --- HẾT PHẦN ÂM THANH ---
+        // --- Hết Âm thanh ---
 
-        // Hàm khởi động, được gọi bởi nút "Bắt đầu"
+        // Hàm khởi động (đã sửa lỗi 'TypeError')
         async function init() {
-            // Mở khóa âm thanh (sửa lỗi trình duyệt chặn)
+            
+            // *** SỬA LỖI QUAN TRỌNG NHẤT (FIX LỖI CAMERA ĐỨNG YÊN) ***
+            // Dòng này PHẢI được gọi ĐẦU TIÊN để kết nối biến với thẻ HTML
+            labelContainer = document.getElementById("label-container");
+            labelContainer.innerHTML = "Đang tải 'bộ não' AI..."; // Thông báo cho người dùng
+
+            // --- Mở khóa Âm thanh (sửa lỗi trình duyệt chặn) ---
             try {
                 soundrac_vo_co.play(); soundrac_vo_co.pause();
                 soundrac_huu_co.play(); soundrac_huu_co.pause();
@@ -47,18 +56,18 @@
             } catch (e) {
                 console.log("Đang mở khóa âm thanh...");
             }
+            // --- Hết phần mở khóa ---
 
             const modelURL = URL + "model.json";
             const metadataURL = URL + "metadata.json";
 
-            // Tải "bộ não" AI. Nếu link URL sai, nó sẽ báo lỗi ở đây.
+            // Tải "bộ não" AI (có xử lý lỗi 404)
             try {
                 model = await tmImage.load(modelURL, metadataURL);
             } catch (e) {
-                // Hiển thị lỗi 404 nếu không tìm thấy link
                 console.error(e);
-                labelContainer.innerHTML = "LỖI: Không tìm thấy 'bộ não' AI. Hãy lấy link URL mới!";
-                return; // Dừng lại
+                labelContainer.innerHTML = "LỖI 404: Không tìm thấy 'bộ não' AI. Hãy lấy link URL mới!";
+                return; // Dừng lại nếu lỗi
             }
 
             maxPredictions = model.getTotalClasses();
@@ -68,22 +77,24 @@
             webcam = new tmImage.Webcam(300, 300, flip); // Tăng kích thước
             await webcam.setup(); 
             await webcam.play();
-            window.requestAnimationFrame(loop);
+            window.requestAnimationFrame(loop); // Bắt đầu vòng lặp
 
             // Thêm webcam vào trang
             document.getElementById("webcam-container").appendChild(webcam.canvas);
-            // Tạo các dòng nhãn
-            labelContainer.innerHTML = ""; // Xóa chữ "LỖI" (nếu có)
+            
+            // Xóa chữ "Đang tải..." và chuẩn bị các dòng nhãn
+            labelContainer.innerHTML = ""; 
             for (let i = 0; i < maxPredictions; i++) { 
                 labelContainer.appendChild(document.createElement("div"));
             }
+            labelContainer.childNodes[0].innerHTML = "Hãy giơ rác lên!";
         }
 
-        // Vòng lặp liên tục (chạy 60 lần/giây)
+        // Vòng lặp liên tục (để camera "live")
         async function loop() {
-            webcam.update(); 
-            await predict();
-            window.requestAnimationFrame(loop);
+            webcam.update(); // Cập nhật hình ảnh webcam
+            await predict(); // Chạy dự đoán
+            window.requestAnimationFrame(loop); // Lặp lại
         }
 
         // Hàm dự đoán
@@ -92,21 +103,23 @@
             let highestProb = 0;
             let highestLabel = "";
 
+            // Lặp qua các kết quả dự đoán
             for (let i = 0; i < maxPredictions; i++) {
                 // Hiển thị nhãn và %
                 const classPrediction = prediction[i].className + ": " + prediction[i].probability.toFixed(2);
                 labelContainer.childNodes[i].innerHTML = classPrediction;
 
-                // Tìm nhãn cao nhất
+                // Tìm nhãn có % cao nhất
                 if (prediction[i].probability > highestProb) {
                     highestProb = prediction[i].probability;
                     highestLabel = prediction[i].className;
                 }
             }
 
-            // Logic phát âm thanh (không thay đổi)
+            // --- Logic phát âm thanh (Giữ nguyên, code này đã đúng) ---
             if (highestProb > 0.90) { 
                 if (highestLabel !== lastPlayedLabel) {
+                    
                     if (highestLabel === "Rac_vo_co") { 
                         soundrac_vo_co.play();
                         lastPlayedLabel = "Rac_vo_co";
@@ -127,16 +140,25 @@
             } else {
                 lastPlayedLabel = "";
             }
+            // --- Hết logic âm thanh ---
         }
     </script>
     
     <hr>
     <h1>Trạm 2: Hành Trình Của Rác</h1>
-    <p>... (Nội dung trạm 2 của bạn) ...</p>
+    <p>... (Dán mã nhúng video YouTube, Padlet, Google Form, v.v... của bạn vào đây) ...</p>
     
     <hr>
     <h1>Trạm 3: Thử Thách Sáng Tạo</h1>
     <p>... (Nội dung trạm 3 của bạn) ...</p>
+    
+    <hr>
+    <h1>Trạm 4: Phòng Trưng Bày</h1>
+    <p>... (Nội dung trạm 4 của bạn, ví dụ nhúng Padlet) ...</p>
+
+    <hr>
+    <h1>Trạm 5: Bảng Vàng Bình Chọn</h1>
+    <p>... (Nội dung trạm 5 của bạn, ví dụ nhúng Google Form) ...</p>
 
 </body>
 </html>
