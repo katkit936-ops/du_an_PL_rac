@@ -1,0 +1,108 @@
+<script type="text/javascript">
+    // Link URL đến mô hình AI của bạn
+    const URL = "https://teachablemachine.withgoogle.com/models/886agW9F2/";
+
+    let model, webcam, labelContainer, maxPredictions;
+
+    // --- PHẦN TÍCH HỢP ÂM THANH ---
+    const soundrac_vo_co = new Audio('rac_vo_co.mp3');
+    const soundrac_huu_co = new Audio('rac_huu_co.mp3');
+    const soundrac_vo_co_khong_tai_che = new Audio('rac_vo_co_khong_tai_che.mp3');
+    const soundhay_cho_rac = new Audio('hay_cho_rac.mp3');
+
+    let lastPlayedLabel = ""; 
+    // --- HẾT PHẦN ÂM THANH ---
+
+
+    // Load the image model and setup the webcam
+    async function init() {
+        
+        // --- BẮT ĐẦU PHẦN SỬA LỖI ---
+        // "Mở khóa" âm thanh cho trình duyệt bằng cách play/pause khi người dùng click "Bắt đầu"
+        // (Trình duyệt sẽ ghi nhận là người dùng đã cho phép)
+        try {
+            soundrac_vo_co.play();
+            soundrac_vo_co.pause();
+            soundrac_huu_co.play();
+            soundrac_huu_co.pause();
+            soundrac_vo_co_khong_tai_che.play();
+            soundrac_vo_co_khong_tai_che.pause();
+            soundhay_cho_rac.play();
+            soundhay_cho_rac.pause();
+        } catch (e) {
+            console.log("Lỗi khi mở khóa âm thanh, nhưng không sao.");
+        }
+        // --- KẾT THÚC PHẦN SỬA LỖI ---
+
+        const modelURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
+
+        // load the model and metadata
+        model = await tmImage.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
+
+        // Setup webcam
+        const flip = true; // whether to flip the webcam
+        webcam = new tmImage.Webcam(200, 200, flip); // width, height, flip
+        await webcam.setup(); // request access to the webcam
+        await webcam.play();
+        window.requestAnimationFrame(loop);
+
+        // append elements to the DOM
+        document.getElementById("webcam-container").appendChild(webcam.canvas);
+        labelContainer = document.getElementById("label-container");
+        for (let i = 0; i < maxPredictions; i++) { // and class labels
+            labelContainer.appendChild(document.createElement("div"));
+        }
+    }
+
+    async function loop() {
+        webcam.update(); // update the webcam frame
+        await predict();
+        window.requestAnimationFrame(loop);
+    }
+
+    // run the webcam image through the image model
+    async function predict() {
+        const prediction = await model.predict(webcam.canvas);
+        let highestProb = 0;
+        let highestLabel = "";
+
+        for (let i = 0; i < maxPredictions; i++) {
+            const classPrediction =
+                prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+            labelContainer.childNodes[i].innerHTML = classPrediction;
+
+            if (prediction[i].probability > highestProb) {
+                highestProb = prediction[i].probability;
+                highestLabel = prediction[i].className;
+            }
+        }
+
+        // --- PHẦN LOGIC PHÁT ÂM THANH ---
+        if (highestProb > 0.90) { 
+            if (highestLabel !== lastPlayedLabel) {
+                
+                if (highestLabel === "Rac_vo_co") { 
+                    soundrac_vo_co.play();
+                    lastPlayedLabel = "Rac_vo_co";
+                } 
+                else if (highestLabel === "Rac_huu_co") {
+                    soundrac_huu_co.play();
+                    lastPlayedLabel = "Rac_huu_co";
+                } 
+                else if (highestLabel === "Rac_vo_co_khong_tai_che") {
+                    soundrac_vo_co_khong_tai_che.play();
+                    lastPlayedLabel = "Rac_vo_co_khong_tai_che";
+                }
+                else if (highestLabel === "Hay_cho_rac") {
+                    soundhay_cho_rac.play();
+                    lastPlayedLabel = "Hay_cho_rac";
+                }
+            }
+        } else {
+            lastPlayedLabel = "";
+        }
+        // --- HẾT PHẦN LOGIC ÂM THANH ---
+    }
+</script>
