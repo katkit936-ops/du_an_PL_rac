@@ -1,108 +1,142 @@
-<script type="text/javascript">
-    // Link URL đến mô hình AI của bạn
-    const URL = "https://teachablemachine.withgoogle.com/models/886agW9F2/";
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Trạm 1: AI Phân Loại Rác</title>
+    <style>
+        /* CSS để giao diện đẹp hơn một chút */
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 20px; }
+        #webcam-container { margin-top: 10px; border: 2px solid black; display: inline-block; }
+        #label-container { margin-top: 10px; font-size: 1.2em; font-weight: bold; }
+        button { font-size: 1.2em; padding: 10px 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
 
-    let model, webcam, labelContainer, maxPredictions;
+    <h1>Trạm 1: AI Phân Loại Rác</h1>
+    <button type="button" onclick="init()">Bắt đầu</button>
+    <div id="webcam-container"></div>
+    <div id="label-container"></div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 
-    // --- PHẦN TÍCH HỢP ÂM THANH ---
-    const soundrac_vo_co = new Audio('rac_vo_co.mp3');
-    const soundrac_huu_co = new Audio('rac_huu_co.mp3');
-    const soundrac_vo_co_khong_tai_che = new Audio('rac_vo_co_khong_tai_che.mp3');
-    const soundhay_cho_rac = new Audio('hay_cho_rac.mp3');
+    <script type="text/javascript">
+        // *** BƯỚC QUAN TRỌNG NHẤT Ở ĐÂY ***
+        // LẤY LINK MỚI TỪ TEACHABLE MACHINE VÀ DÁN VÀO ĐÂY
+        const URL = "https://teachablemachine.withgoogle.com/models/886agW9F2/";
 
-    let lastPlayedLabel = ""; 
-    // --- HẾT PHẦN ÂM THANH ---
+        let model, webcam, labelContainer, maxPredictions;
 
+        // --- PHẦN ÂM THANH ---
+        const soundrac_vo_co = new Audio('rac_vo_co.mp3');
+        const soundrac_huu_co = new Audio('rac_huu_co.mp3');
+        const soundrac_vo_co_khong_tai_che = new Audio('rac_vo_co_khong_tai_che.mp3');
+        const soundhay_cho_rac = new Audio('hay_cho_rac.mp3');
+        let lastPlayedLabel = "";
+        // --- HẾT PHẦN ÂM THANH ---
 
-    // Load the image model and setup the webcam
-    async function init() {
-        
-        // --- BẮT ĐẦU PHẦN SỬA LỖI ---
-        // "Mở khóa" âm thanh cho trình duyệt bằng cách play/pause khi người dùng click "Bắt đầu"
-        // (Trình duyệt sẽ ghi nhận là người dùng đã cho phép)
-        try {
-            soundrac_vo_co.play();
-            soundrac_vo_co.pause();
-            soundrac_huu_co.play();
-            soundrac_huu_co.pause();
-            soundrac_vo_co_khong_tai_che.play();
-            soundrac_vo_co_khong_tai_che.pause();
-            soundhay_cho_rac.play();
-            soundhay_cho_rac.pause();
-        } catch (e) {
-            console.log("Lỗi khi mở khóa âm thanh, nhưng không sao.");
-        }
-        // --- KẾT THÚC PHẦN SỬA LỖI ---
+        // Hàm khởi động, được gọi bởi nút "Bắt đầu"
+        async function init() {
+            // Mở khóa âm thanh (sửa lỗi trình duyệt chặn)
+            try {
+                soundrac_vo_co.play(); soundrac_vo_co.pause();
+                soundrac_huu_co.play(); soundrac_huu_co.pause();
+                soundrac_vo_co_khong_tai_che.play(); soundrac_vo_co_khong_tai_che.pause();
+                soundhay_cho_rac.play(); soundhay_cho_rac.pause();
+            } catch (e) {
+                console.log("Đang mở khóa âm thanh...");
+            }
 
-        const modelURL = URL + "model.json";
-        const metadataURL = URL + "metadata.json";
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
 
-        // load the model and metadata
-        model = await tmImage.load(modelURL, metadataURL);
-        maxPredictions = model.getTotalClasses();
+            // Tải "bộ não" AI. Nếu link URL sai, nó sẽ báo lỗi ở đây.
+            try {
+                model = await tmImage.load(modelURL, metadataURL);
+            } catch (e) {
+                // Hiển thị lỗi 404 nếu không tìm thấy link
+                console.error(e);
+                labelContainer.innerHTML = "LỖI: Không tìm thấy 'bộ não' AI. Hãy lấy link URL mới!";
+                return; // Dừng lại
+            }
 
-        // Setup webcam
-        const flip = true; // whether to flip the webcam
-        webcam = new tmImage.Webcam(200, 200, flip); // width, height, flip
-        await webcam.setup(); // request access to the webcam
-        await webcam.play();
-        window.requestAnimationFrame(loop);
+            maxPredictions = model.getTotalClasses();
 
-        // append elements to the DOM
-        document.getElementById("webcam-container").appendChild(webcam.canvas);
-        labelContainer = document.getElementById("label-container");
-        for (let i = 0; i < maxPredictions; i++) { // and class labels
-            labelContainer.appendChild(document.createElement("div"));
-        }
-    }
+            // Cài đặt webcam
+            const flip = true; 
+            webcam = new tmImage.Webcam(300, 300, flip); // Tăng kích thước
+            await webcam.setup(); 
+            await webcam.play();
+            window.requestAnimationFrame(loop);
 
-    async function loop() {
-        webcam.update(); // update the webcam frame
-        await predict();
-        window.requestAnimationFrame(loop);
-    }
-
-    // run the webcam image through the image model
-    async function predict() {
-        const prediction = await model.predict(webcam.canvas);
-        let highestProb = 0;
-        let highestLabel = "";
-
-        for (let i = 0; i < maxPredictions; i++) {
-            const classPrediction =
-                prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-            labelContainer.childNodes[i].innerHTML = classPrediction;
-
-            if (prediction[i].probability > highestProb) {
-                highestProb = prediction[i].probability;
-                highestLabel = prediction[i].className;
+            // Thêm webcam vào trang
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            // Tạo các dòng nhãn
+            labelContainer.innerHTML = ""; // Xóa chữ "LỖI" (nếu có)
+            for (let i = 0; i < maxPredictions; i++) { 
+                labelContainer.appendChild(document.createElement("div"));
             }
         }
 
-        // --- PHẦN LOGIC PHÁT ÂM THANH ---
-        if (highestProb > 0.90) { 
-            if (highestLabel !== lastPlayedLabel) {
-                
-                if (highestLabel === "Rac_vo_co") { 
-                    soundrac_vo_co.play();
-                    lastPlayedLabel = "Rac_vo_co";
-                } 
-                else if (highestLabel === "Rac_huu_co") {
-                    soundrac_huu_co.play();
-                    lastPlayedLabel = "Rac_huu_co";
-                } 
-                else if (highestLabel === "Rac_vo_co_khong_tai_che") {
-                    soundrac_vo_co_khong_tai_che.play();
-                    lastPlayedLabel = "Rac_vo_co_khong_tai_che";
-                }
-                else if (highestLabel === "Hay_cho_rac") {
-                    soundhay_cho_rac.play();
-                    lastPlayedLabel = "Hay_cho_rac";
+        // Vòng lặp liên tục (chạy 60 lần/giây)
+        async function loop() {
+            webcam.update(); 
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        // Hàm dự đoán
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            let highestProb = 0;
+            let highestLabel = "";
+
+            for (let i = 0; i < maxPredictions; i++) {
+                // Hiển thị nhãn và %
+                const classPrediction = prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+                labelContainer.childNodes[i].innerHTML = classPrediction;
+
+                // Tìm nhãn cao nhất
+                if (prediction[i].probability > highestProb) {
+                    highestProb = prediction[i].probability;
+                    highestLabel = prediction[i].className;
                 }
             }
-        } else {
-            lastPlayedLabel = "";
+
+            // Logic phát âm thanh (không thay đổi)
+            if (highestProb > 0.90) { 
+                if (highestLabel !== lastPlayedLabel) {
+                    if (highestLabel === "Rac_vo_co") { 
+                        soundrac_vo_co.play();
+                        lastPlayedLabel = "Rac_vo_co";
+                    } 
+                    else if (highestLabel === "Rac_huu_co") {
+                        soundrac_huu_co.play();
+                        lastPlayedLabel = "Rac_huu_co";
+                    } 
+                    else if (highestLabel === "Rac_vo_co_khong_tai_che") {
+                        soundrac_vo_co_khong_tai_che.play();
+                        lastPlayedLabel = "Rac_vo_co_khong_tai_che";
+                    }
+                    else if (highestLabel === "Hay_cho_rac") {
+                        soundhay_cho_rac.play();
+                        lastPlayedLabel = "Hay_cho_rac";
+                    }
+                }
+            } else {
+                lastPlayedLabel = "";
+            }
         }
-        // --- HẾT PHẦN LOGIC ÂM THANH ---
-    }
-</script>
+    </script>
+    
+    <hr>
+    <h1>Trạm 2: Hành Trình Của Rác</h1>
+    <p>... (Nội dung trạm 2 của bạn) ...</p>
+    
+    <hr>
+    <h1>Trạm 3: Thử Thách Sáng Tạo</h1>
+    <p>... (Nội dung trạm 3 của bạn) ...</p>
+
+</body>
+</html>
